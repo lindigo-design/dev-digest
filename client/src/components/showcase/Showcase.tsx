@@ -50,6 +50,9 @@ import { ConfirmDialog } from "../confirm-dialog";
 import { SeverityTally } from "../severity-tally";
 import { FindingsCell } from "../../app/repos/[repoId]/pulls/_components/FindingsCell";
 import { SeverityCounters } from "../../app/repos/[repoId]/pulls/[number]/_components/FindingsPanel/_components/SeverityCounters";
+import { GroupHeader } from "../../app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/GroupHeader";
+import { LargePrBanner } from "../../app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/LargePrBanner";
+import { DiffToolbar } from "../../app/repos/[repoId]/pulls/[number]/_components/DiffTab/_components/DiffToolbar";
 import { s } from "./styles";
 import { SEVERITIES, CATEGORIES, MODEL_OPTIONS } from "./constants";
 
@@ -183,6 +186,56 @@ export function Gallery() {
         <RunCostBadge variant="compact" costUsd={0.014} />
         <RunCostBadge variant="detailed" costUsd={0.0013} tokensIn={8200} tokensOut={919} />
         <RunCostBadge variant="compact" costUsd={null} />
+      </Group>
+
+      <Group title="Smart Diff (group header · large PR banner · toolbar)">
+        <div style={s.w420}>
+          <GroupHeader
+            color="var(--viz-1)"
+            fileCount={3}
+            findingFiles={1}
+            open
+            onToggleOpen={() => {}}
+            allOpen={false}
+            onToggleAll={() => {}}
+            stickyTop={0}
+            labels={{
+              title: "Core",
+              description: "Main logic changes",
+              files: "3 files",
+              findingFiles: "● 1",
+              findingFilesHint: "1 file with findings",
+              toggleAll: "Expand all",
+            }}
+          />
+          <GroupHeader
+            color="var(--text-muted)"
+            fileCount={1}
+            findingFiles={0}
+            open={false}
+            onToggleOpen={() => {}}
+            allOpen
+            onToggleAll={() => {}}
+            stickyTop={0}
+            labels={{
+              title: "Docs",
+              description: "Documentation",
+              files: "1 file",
+              findingFiles: "● 0",
+              findingFilesHint: "0 files with findings",
+              toggleAll: "Collapse all",
+            }}
+          />
+        </div>
+        <div style={s.w420}>
+          <LargePrBanner title="This PR is large (1240 changed lines)" />
+        </div>
+        <DiffToolbar
+          mode="smart"
+          onModeChange={() => {}}
+          findingsToggle={{ label: "Hide findings (3)", shown: true, disabled: false, onToggle: () => {} }}
+          labels={{ toolbar: "Diff view", smart: "Smart order", original: "Original order" }}
+        />
       </Group>
 
       <Group title="Skill type badge">
