@@ -18,6 +18,8 @@ interface SmartDiffGroupProps {
 export function SmartDiffGroup({ group, commenting, findings, stickyTop }: SmartDiffGroupProps) {
   const t = useTranslations("prReview");
   const [overrides, setOverrides] = React.useState<Record<string, boolean>>({});
+  // The whole group folds down to its header (label, ● N, file count); per-file state is kept.
+  const [open, setOpen] = React.useState(true);
 
   const { role, files } = group;
   const isOpen = (path: string): boolean => {
@@ -39,7 +41,10 @@ export function SmartDiffGroup({ group, commenting, findings, stickyTop }: Smart
     <div style={s.root}>
       <GroupHeader
         color={GROUP_COLOR[role]}
+        fileCount={files.length}
         findingFiles={findingFiles}
+        open={open}
+        onToggleOpen={() => setOpen((v) => !v)}
         allOpen={allOpen}
         onToggleAll={toggleAll}
         stickyTop={stickyTop}
@@ -52,7 +57,7 @@ export function SmartDiffGroup({ group, commenting, findings, stickyTop }: Smart
           toggleAll: t(allOpen ? "smartDiff.collapseAll" : "smartDiff.expandAll"),
         }}
       />
-      {files.length > 0 && (
+      {open && files.length > 0 && (
         <DiffViewer files={files} commenting={commenting} findings={findings} expansion={{ isOpen, toggle }} />
       )}
     </div>

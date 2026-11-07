@@ -248,6 +248,49 @@ describe("DiffTab", () => {
     expect(screen.queryByText("human remark")).not.toBeInTheDocument();
   });
 
+  it("Hide findings removes every finding marker; Show findings brings them back", () => {
+    reviewsData = [review("r1", "A", [finding("f1"), finding("w1", { severity: "WARNING", start_line: 3 })])];
+    renderTab();
+    const markers = () => ({
+      cards: screen.queryAllByText(/^title /).length,
+      lineIcons: screen.queryAllByRole("img", { name: /^(blocker|warning)$/ }).length,
+      fileDots: screen.queryAllByRole("img", { name: /in this file/ }).length,
+      groupDots: screen.queryAllByText(/^● /).length,
+    });
+    expect(markers()).toEqual({ cards: 2, lineIcons: 2, fileDots: 1, groupDots: 1 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide findings (2)" }));
+    expect(markers()).toEqual({ cards: 0, lineIcons: 0, fileDots: 0, groupDots: 0 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show findings (2)" }));
+    expect(markers()).toEqual({ cards: 2, lineIcons: 2, fileDots: 1, groupDots: 1 });
+  });
+
+  it("folds a whole group to its header, keeping the ● N and file counts", () => {
+    reviewsData = [review("r1", "A", [finding("f1")])];
+    renderTab();
+    const header = screen.getByRole("heading", { level: 3, name: "Core" }).parentElement!;
+    const fold = within(header).getByRole("button", { name: "Core" });
+    expect(fold).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("src/a.ts")).toBeInTheDocument();
+
+    fireEvent.click(fold);
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("src/a.ts")).not.toBeInTheDocument();
+    expect(screen.queryByText("title f1")).not.toBeInTheDocument();
+    expect(within(header).getByText("● 1")).toBeInTheDocument();
+    expect(within(header).getByText("3 files")).toBeInTheDocument();
+
+    fireEvent.click(fold);
+    expect(screen.getByText("src/a.ts")).toBeInTheDocument();
+  });
+
+  it("shows the PR totals under the title", () => {
+    renderTab();
+    const summary = screen.getByText("+3").parentElement!;
+    expect(summary).toHaveTextContent("3 files·+3−0");
+  });
+
   it("disables the toggle with no findings and says the review has not run", () => {
     renderTab();
     expect(screen.getByRole("button", { name: "Hide findings (0)" })).toBeDisabled();

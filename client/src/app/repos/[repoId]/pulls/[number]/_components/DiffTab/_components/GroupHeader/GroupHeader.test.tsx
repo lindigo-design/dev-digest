@@ -13,10 +13,14 @@ const LABELS = {
 
 function renderHeader(props: Partial<React.ComponentProps<typeof GroupHeader>> = {}) {
   const onToggleAll = vi.fn();
+  const onToggleOpen = vi.fn();
   render(
     <GroupHeader
       color="var(--viz-1)"
+      fileCount={3}
       findingFiles={1}
+      open
+      onToggleOpen={onToggleOpen}
       allOpen={false}
       onToggleAll={onToggleAll}
       stickyTop={0}
@@ -24,11 +28,11 @@ function renderHeader(props: Partial<React.ComponentProps<typeof GroupHeader>> =
       {...props}
     />,
   );
-  return { onToggleAll };
+  return { onToggleAll, onToggleOpen };
 }
 
 describe("GroupHeader", () => {
-  it("lays out label + description left, then dot N, files, toggle on the right; toggles all", () => {
+  it("lays out fold + label + description left, then dot N, files, toggle-all icon on the right", () => {
     const { onToggleAll } = renderHeader();
     const title = screen.getByRole("heading", { level: 3, name: "Core changes" });
     const description = screen.getByText("Logic that matters most");
@@ -41,8 +45,27 @@ describe("GroupHeader", () => {
     expect(follows(dot, files)).toBe(true);
     expect(follows(files, toggle)).toBe(true);
     expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent(""); // icon-only, named by aria-label
     fireEvent.click(toggle);
     expect(onToggleAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("the title is a fold button that reflects and toggles the group's open state", () => {
+    const { onToggleOpen } = renderHeader({ open: false });
+    const fold = screen.getByRole("button", { name: "Core changes" });
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(fold);
+    expect(onToggleOpen).toHaveBeenCalledTimes(1);
+    // Folded: the counts stay, the toggle-all button goes (there are no files on screen to toggle).
+    expect(screen.getByText("● 1")).toBeInTheDocument();
+    expect(screen.getByText("3 files")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand all" })).not.toBeInTheDocument();
+  });
+
+  it("an empty group has no fold button and no toggle-all", () => {
+    renderHeader({ fileCount: 0, findingFiles: 0, labels: { ...LABELS, files: "0 files" } });
+    expect(screen.getByRole("heading", { level: 3, name: "Core changes" })).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("hides the dot counter at 0 findings and reflects allOpen", () => {
@@ -50,7 +73,7 @@ describe("GroupHeader", () => {
     expect(screen.queryByText(/●/)).not.toBeInTheDocument();
     // Nothing else (e.g. a stray "0" text node from `findingFiles && …`) may render next to files + toggle.
     const right = screen.getByText("3 files").parentElement;
-    expect(right?.textContent).toBe("3 filesExpand all");
+    expect(right?.textContent).toBe("3 files");
     expect(screen.getByRole("button", { name: "Expand all" })).toHaveAttribute("aria-expanded", "true");
   });
 

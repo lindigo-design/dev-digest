@@ -192,7 +192,10 @@ export function Gallery() {
         <div style={s.w420}>
           <GroupHeader
             color="var(--viz-1)"
+            fileCount={3}
             findingFiles={1}
+            open
+            onToggleOpen={() => {}}
             allOpen={false}
             onToggleAll={() => {}}
             stickyTop={0}
@@ -207,7 +210,10 @@ export function Gallery() {
           />
           <GroupHeader
             color="var(--text-muted)"
+            fileCount={1}
             findingFiles={0}
+            open={false}
+            onToggleOpen={() => {}}
             allOpen
             onToggleAll={() => {}}
             stickyTop={0}
@@ -222,7 +228,7 @@ export function Gallery() {
           />
         </div>
         <div style={s.w420}>
-          <LargePrBanner title="Large pull request" body="Consider splitting it into smaller changes." />
+          <LargePrBanner title="This PR is large (1240 changed lines)" />
         </div>
         <DiffToolbar
           mode="smart"

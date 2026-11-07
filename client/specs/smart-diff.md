@@ -42,7 +42,7 @@ under the flagged line with Accept/Dismiss. A toggle switches back to GitHub's o
 | boilerplate | grey `--text-muted` | Generated / mechanical — skim |
 
 - Strings in `messages/en/prReview.json` → `smartDiff` (existing `coreLabel`, `wiringLabel`,
-  `boilerplateLabel`, `filesCount`, `largeTitle`, `largeBody`; add `testsLabel`, `docsLabel`, the five
+  `boilerplateLabel`, `filesCount`, `largeTitle`; add `testsLabel`, `docsLabel`, the five
   descriptions and the new labels below).
 - New/changed UI components are added to `/showcase` without `useTranslations` (strings as props).
 
@@ -57,9 +57,11 @@ under the flagged line with Accept/Dismiss. A toggle switches back to GitHub's o
 - **C1** Smart order (default) shows **all five groups always**, in order core → tests → wiring → docs →
   boilerplate, including empty ones ("Boilerplate · 0 files") — test with a response where 2 groups
   are empty asserts 5 headers in that order.
-- **C2** Each group header: color marker, role label and description on the left; on the right
-  "● N" (C5), "{count} files" and an expand/collapse-all button that opens/closes every file in the
-  group.
+- **C2** Each group header: a fold chevron, color marker, role label and description on the left; on the
+  right "● N" (C5), "{count} files" and an icon-only expand/collapse-all button (accessible name
+  "Expand all" / "Collapse all") that opens/closes every file in the group. The label is a fold button
+  (`aria-expanded`) that folds the whole group down to its header, keeping "● N" and "{count} files"
+  visible; groups start unfolded. An empty group has neither the fold button nor the toggle.
 - **C3** Default expansion: docs and boilerplate groups start collapsed; in other groups each file
   follows `AUTO_EXPAND_MAX_LINES` (`src/components/diff-viewer/constants.ts`).
 - **C4** Toolbar with three controls: **Smart order** / **Original order** (flat GitHub file order =
@@ -81,7 +83,8 @@ under the flagged line with Accept/Dismiss. A toggle switches back to GitHub's o
 - **C9** A finding whose `start_line` is not in the patch renders in a separate block at the **end of that
   file**, not dropped.
 - **C10** One "Hide findings (N)" / "Show findings (N)" toggle hides/shows finding cards **and** GitHub
-  comment threads together (replaces today's comments-only toggle); **starts on "shown"**; N = number of
+  comment threads together (replaces today's comments-only toggle) — hidden means **no finding marker
+  at all**: no cards, line bars/icons, file dots/counters or group "● N"; **starts on "shown"**; N = number of
   **non-dismissed** findings from the latest review of each agent in the PR's files (two agents with
   5 + 3 → "Hide findings (8)"); the label is always "Hide/Show findings (N)"; the toggle is
   **disabled when N = 0**. Composing a new comment still works while hidden.
@@ -94,7 +97,8 @@ under the flagged line with Accept/Dismiss. A toggle switches back to GitHub's o
   as 0. Test: two agents' runs 1 200 + 800 → "built on 2,000"; hidden before the first review.
 - **C13** After Run review completes, group counters, dots and cards update without a page reload
   (invalidation test).
-- **C14** "This PR is large ({lines} changed lines)" banner (`largeTitle` / `largeBody`) renders when
+- **C14** One-line warning banner "⚠ This PR is large ({lines} changed lines)" (`largeTitle`; no hint
+  line, since `proposed_splits` is always empty) renders when
   `split_suggestion.too_big` is true, with `total_lines`; not rendered when false (both pinned by tests
   with fixtures; the server sets `too_big` when `total_lines > 1000`).
 

@@ -3,10 +3,8 @@ import { render, screen } from "@testing-library/react";
 import { LargePrBanner } from "./LargePrBanner";
 
 describe("LargePrBanner", () => {
-  it("shows title and body in a note", () => {
-    render(<LargePrBanner title="Large PR" body="Consider splitting it." />);
-    const note = screen.getByRole("note");
-    expect(note).toHaveTextContent("Large PR");
-    expect(note).toHaveTextContent("Consider splitting it.");
+  it("is a one-line note with just the title — no dangling hint", () => {
+    render(<LargePrBanner title="This PR is large (5099 changed lines)" />);
+    expect(screen.getByRole("note")).toHaveTextContent(/^This PR is large \(5099 changed lines\)$/);
   });
 });

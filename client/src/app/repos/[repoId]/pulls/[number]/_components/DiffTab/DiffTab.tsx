@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { SectionLabel, Skeleton, ErrorState } from "@devdigest/ui";
+import { ErrorState, Icon, SectionLabel, Skeleton } from "@devdigest/ui";
 import { DiffViewer, type DiffCommentApi, type DiffFindingApi } from "@/components/diff-viewer";
 import { FindingCard } from "@/components/finding-card";
 import { notify } from "@/lib/toast";
@@ -49,8 +49,9 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
     },
   };
 
+  // Hidden findings leave no trace in the diff: no cards, line bars/icons, file dots or group "● N".
   const findingApi: DiffFindingApi = {
-    findings,
+    findings: showFindings ? findings : [],
     show: showFindings,
     renderCard: (f) => (
       <FindingCard
@@ -73,6 +74,8 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
   };
 
   const splitSuggestion = smart.data?.split_suggestion;
+  const additions = files.reduce((n, f) => n + f.additions, 0);
+  const deletions = files.reduce((n, f) => n + f.deletions, 0);
 
   return (
     <section>
@@ -98,13 +101,21 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
       >
         Files changed · {filesCount} files
       </SectionLabel>
+      <p style={s.summary}>
+        <span>{t("smartDiff.filesCount", { count: filesCount })}</span>
+        <span aria-hidden>·</span>
+        <span style={s.add}>+{additions}</span>
+        <span style={s.del}>−{deletions}</span>
+      </p>
       {reviewsLoaded && !hasReview && <p style={s.note}>{t("smartDiff.notRunYet")}</p>}
-      {hasReview && tokens !== null && <p style={s.note}>{t("smartDiff.tokensNote", { tokens })}</p>}
+      {hasReview && tokens !== null && (
+        <p style={s.note}>
+          <Icon.Zap size={13} aria-hidden style={s.zap} />
+          {t("smartDiff.tokensNote", { tokens })}
+        </p>
+      )}
       {splitSuggestion?.too_big && (
-        <LargePrBanner
-          title={t("smartDiff.largeTitle", { lines: splitSuggestion.total_lines })}
-          body={t("smartDiff.largeBody")}
-        />
+        <LargePrBanner title={t("smartDiff.largeTitle", { lines: splitSuggestion.total_lines })} />
       )}
       {mode === "original" ? (
         <DiffViewer files={files} commenting={commenting} findings={findingApi} />
