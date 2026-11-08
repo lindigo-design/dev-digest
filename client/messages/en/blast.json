@@ -7,12 +7,63 @@
   },
   "view": {
     "tree": "tree",
-    "graph": "graph"
+    "graph": "graph",
+    "ariaLabel": "Blast radius view"
   },
-  "callerCount": "{count} callers",
+  "callerCount": "{count, plural, one {# caller} other {# callers}}",
   "noDownstream": "{count} changed symbol(s), no downstream callers found.",
+  "loading": "Loading blast radius…",
+  "loadError": "Couldn't load the blast radius",
+  "summary": {
+    "ariaLabel": "Blast radius summary",
+    "symbols": "{count, plural, one {<n>#</n> symbol} other {<n>#</n> symbols}}",
+    "callers": "{count, plural, one {<n>#</n> caller} other {<n>#</n> callers}}",
+    "endpoints": "{count, plural, one {<n>#</n> endpoint} other {<n>#</n> endpoints}}",
+    "crons": "{count, plural, one {<n>#</n> cron} other {<n>#</n> crons}}"
+  },
+  "chips": {
+    "endpoints": "Endpoints affected",
+    "crons": "Crons affected",
+    "more": "+{count} more",
+    "less": "Show less"
+  },
+  "unattributed": "Endpoints in caller files (not attributed to a symbol)",
+  "withoutCallers": "{count, plural, one {# more changed symbol has} other {# more changed symbols have}} no callers.",
+  "callersOmitted": "{count, plural, one {# more caller is} other {# more callers are}} not shown (top callers per symbol, by file rank).",
+  "degraded": {
+    "flag_off": "Repo intelligence is turned off on the server (REPO_INTEL_ENABLED=false). Callers come from a best-effort text search and may be incomplete.",
+    "no_data": "This repository has no code index yet, so callers can't be mapped. The index is built after the repository is cloned.",
+    "index_partial": "The code index is partial — some callers may be missing.",
+    "index_failed": "The last indexing run failed — callers may be missing or outdated.",
+    "repo_too_large": "The repository is too large to index fully — callers may be missing."
+  },
+  "resync": {
+    "hint": "Resync fetches the latest default branch and rebuilds the index; this map refreshes when it finishes.",
+    "button": "Resync index",
+    "running": "Resyncing…",
+    "timeout": "Resync is still running — reload this page in a minute."
+  },
   "graph": {
     "empty": "No downstream callers to graph.",
-    "ariaLabel": "Blast radius graph"
+    "ariaLabel": "Blast radius graph",
+    "legend": {
+      "symbol": "changed symbol",
+      "callers": "callers",
+      "endpoints": "endpoints affected"
+    },
+    "truncated": "{count, plural, one {# more node is} other {# more nodes are}} not shown — switch to Tree for the full list.",
+    "cronsHint": "Crons are listed in the Tree view."
+  },
+  "toggle": {
+    "expand": "Expand {symbol}, {count, plural, one {# caller} other {# callers}}",
+    "collapse": "Collapse {symbol}, {count, plural, one {# caller} other {# callers}}"
+  },
+  "prior": {
+    "title": "Prior PRs touching these files",
+    "countAria": "{count, plural, one {# prior PR} other {# prior PRs}}",
+    "empty": "No earlier PR in this repository touched these files.",
+    "loadError": "Couldn't load prior PRs.",
+    "sharedFiles": "{count, plural, one {# shared file} other {# shared files}}",
+    "more": "{count, plural, one {# more earlier PR} other {# more earlier PRs}} not shown."
   }
 }
