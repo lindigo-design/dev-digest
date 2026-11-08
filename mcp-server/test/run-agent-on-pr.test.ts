@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ApiRun } from '../src/api-client.js';
+import { DEFAULT_RUN_TIMEOUT_MS, loadConfig, TYPICAL_CLIENT_TIMEOUT_MS } from '../src/config.js';
 import { connect, freshState, SECURITY, text, type FakeState } from './helpers/harness.js';
 
 let close: (() => Promise<void>) | undefined;
@@ -14,7 +15,7 @@ async function setup(state: FakeState = freshState(), config = {}) {
   return { ...c, state };
 }
 
-const RUN_ARGS = { repo: 'acme/payments-api', pr: 3, agent: 'Security Reviewer' };
+const RUN_ARGS = { repo: 'acme/payments-api', pr_id: 3, agent_id: 'Security Reviewer' };
 
 function runningRun(agentId: string, runId: string): ApiRun {
   return { run_id: runId, agent_id: agentId, agent_name: 'x', status: 'running', error: null, ran_at: null };
@@ -109,27 +110,29 @@ describe('run_agent_on_pr: arguments and errors', () => {
     expect(r.isError).toBe(true);
     expect(text(r)).toContain('agent-sec');
     expect(text(r)).toContain('agent-sec-2');
-    expect(text(r)).toContain('Pass the id');
+    expect(text(r)).toContain('Pass the agent_id');
     expect(postCount(state)).toBe(0);
   });
 
-  it('accepts pr as a numeric string and rejects a non-number', async () => {
-    const { call } = await setup();
-    const ok = await call('run_agent_on_pr', { ...RUN_ARGS, pr: '3' });
+  it('accepts pr_id as "#3" and rejects a title part that matches nothing (no run started)', async () => {
+    const { call, state } = await setup();
+    const ok = await call('run_agent_on_pr', { ...RUN_ARGS, pr_id: '#3' });
     expect(ok.isError).toBeFalsy();
     expect((ok.structuredContent as { status: string }).status).toBe('done');
 
-    const bad = await call('run_agent_on_pr', { ...RUN_ARGS, pr: 'abc' });
+    const before = postCount(state);
+    const bad = await call('run_agent_on_pr', { ...RUN_ARGS, pr_id: 'abc' });
     expect(bad.isError).toBe(true);
+    expect(text(bad)).toContain('No PR title in acme/payments-api contains "abc"');
+    expect(postCount(state)).toBe(before);
   });
 
-  it('keeps pr a flat integer in the tool schema', async () => {
+  it('keeps pr_id a flat scalar (number or string) in the tool schema', async () => {
     const { client } = await setup();
     const { tools } = await client.listTools();
     const tool = tools.find((t) => t.name === 'run_agent_on_pr')!;
-    const pr = (tool.inputSchema.properties as Record<string, Record<string, unknown>>).pr!;
-    expect(pr.type).toBe('integer');
-    expect(pr.anyOf).toBeUndefined();
+    const pr = (tool.inputSchema.properties as Record<string, { anyOf?: { type?: string }[] }>).pr_id!;
+    expect(pr.anyOf?.map((s) => s.type).sort()).toEqual(['integer', 'string']);
   });
 
   it('explains a 402 failure with a top-up hint', async () => {
@@ -153,5 +156,37 @@ describe('run_agent_on_pr: arguments and errors', () => {
     expect(r.isError).toBe(true);
     expect(text(r)).toContain('404');
     expect(text(r)).toContain('list_agents');
+  });
+});
+
+describe('run_agent_on_pr: wait budget below client limits', () => {
+  it('the default wait is a constant below the typical client limit (Inspector: 60 s total)', () => {
+    expect(DEFAULT_RUN_TIMEOUT_MS).toBe(50_000);
+    expect(DEFAULT_RUN_TIMEOUT_MS).toBeLessThan(TYPICAL_CLIENT_TIMEOUT_MS);
+    expect(loadConfig({}).runTimeoutMs).toBe(DEFAULT_RUN_TIMEOUT_MS);
+    expect(loadConfig({ DEVDIGEST_RUN_TIMEOUT_MS: '120000' }).runTimeoutMs).toBe(120_000); // opt-in for larger clients
+    expect(loadConfig({ DEVDIGEST_RUN_TIMEOUT_MS: 'nope' }).runTimeoutMs).toBe(DEFAULT_RUN_TIMEOUT_MS);
+  });
+
+  it('counts the budget from the start of the call: slow resolution leaves one status check, then "running" + get_findings', async () => {
+    const state = freshState();
+    state.runStatusSequence = ['running'];
+    state.latencyMs = 60; // ~5 calls before polling = 300 ms > the 150 ms budget
+    const { call } = await setup(state, { runTimeoutMs: 150, pollMs: 1 });
+    const r = await call('run_agent_on_pr', RUN_ARGS);
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent).toMatchObject({ status: 'running', run_id: 'run-new' });
+    expect((r.structuredContent as { next_step: string }).next_step).toContain('get_findings');
+    // 1 dedup lookup before the start + exactly 1 status check after it (budget already spent)
+    expect(runPolls(state)).toBe(2);
+  });
+
+  it('a run that finished during slow resolution is still returned as done (one check after the budget)', async () => {
+    const state = freshState();
+    state.runStatusSequence = ['done'];
+    state.latencyMs = 60;
+    const { call } = await setup(state, { runTimeoutMs: 150, pollMs: 1 });
+    const r = await call('run_agent_on_pr', RUN_ARGS);
+    expect(r.structuredContent).toMatchObject({ status: 'done', run_id: 'run-new' });
   });
 });

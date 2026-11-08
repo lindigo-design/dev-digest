@@ -8,7 +8,7 @@
  * not yet exported, add a placeholder below marked
  * `// TODO: reconcile with @devdigest/shared`.
  */
-import type { SkillType } from "@devdigest/shared";
+import type { ChangedSymbol, DownstreamImpact, SkillType } from "@devdigest/shared";
 
 export type {
   Settings,
@@ -35,6 +35,7 @@ export type {
 
 export type { Review, Finding, Severity, Verdict } from "@devdigest/shared";
 export type { PrBrief, SmartDiff } from "@devdigest/shared";
+export type { ChangedSymbol, BlastCaller, DownstreamImpact } from "@devdigest/shared";
 
 /** UI-only view model for a PR list row (derives display fields from PrMeta). */
 export interface PrRowView {
@@ -211,4 +212,61 @@ export interface IntentOverrideInput {
   intent: string;
   in_scope: string[];
   out_of_scope: string[];
+}
+
+// ---- GET /pulls/:id/blast — mirrors server/src/modules/blast/domain/types.ts (not in @devdigest/shared).
+// Guarded by src/lib/blast-contract.test.ts. TODO: reconcile with @devdigest/shared.
+
+/** Same values and order as server BLAST_DEGRADED_REASONS — blast-contract.test.ts checks both, and that each has a message. */
+export const BLAST_DEGRADED_REASONS = ["flag_off", "index_failed", "index_partial", "repo_too_large", "no_data"] as const;
+export type BlastDegradedReason = (typeof BLAST_DEGRADED_REASONS)[number];
+
+export interface BlastDownstream extends DownstreamImpact {
+  file: string;
+  kind: string;
+}
+
+export interface BlastCounts {
+  symbols: number;
+  callers: number;
+  endpoints: number;
+  crons: number;
+}
+
+/** GET /pulls/:id/blast response (server PrBlastRadius). */
+export interface PrBlastRadius {
+  pr_id: string;
+  head_sha: string;
+  indexed_sha: string | null;
+  /** Commit the caller lines come from (indexed_sha ?? head_sha); links use only this. */
+  link_sha: string;
+  changed_symbols: ChangedSymbol[];
+  downstream: BlastDownstream[];
+  unattributed_endpoints: string[];
+  summary: string;
+  counts: BlastCounts;
+  callers_omitted: number;
+  degraded: boolean;
+  reason: BlastDegradedReason | null;
+}
+
+/** GET /pulls/:id/prior-pulls. Mirrors server/src/modules/blast/domain/types.ts (PriorPullsResponse). */
+export interface PriorPull {
+  pr_id: string;
+  number: number;
+  title: string;
+  author: string;
+  status: string;
+  updated_at: string | null;
+  /** Exact number of this PR's paths the prior PR also touched. */
+  shared_count: number;
+  /** Up to 5 of those paths, sorted. */
+  shared_files: string[];
+}
+
+export interface PriorPullsResponse {
+  pr_id: string;
+  /** All matching earlier PRs; `pulls` holds the newest 10. */
+  total: number;
+  pulls: PriorPull[];
 }

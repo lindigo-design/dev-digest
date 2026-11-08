@@ -8,6 +8,7 @@ export const ApiAgent = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  model: z.string(),
   enabled: z.boolean(),
 });
 export type ApiAgent = z.infer<typeof ApiAgent>;
@@ -34,20 +35,25 @@ export const ApiRun = z.object({
   status: z.string().nullable(), // running | done | failed | cancelled
   error: z.string().nullable(),
   ran_at: z.string().nullable(),
+  /** USD spent by the run (partial for failed runs); null/absent = unknown. */
+  cost_usd: z.number().nullish(),
 });
 export type ApiRun = z.infer<typeof ApiRun>;
 
 export const ApiFinding = z.object({
   severity: z.string(),
+  category: z.string(),
   title: z.string(),
   file: z.string(),
   start_line: z.number().int(),
   rationale: z.string(),
+  suggestion: z.string().nullish(),
   dismissed_at: z.string().nullable(),
 });
 export type ApiFinding = z.infer<typeof ApiFinding>;
 
 export const ApiReview = z.object({
+  id: z.string(),
   run_id: z.string().nullable(),
   agent_id: z.string().nullable(),
   agent_name: z.string().nullish(),
@@ -55,6 +61,8 @@ export const ApiReview = z.object({
   verdict: z.string().nullable(),
   summary: z.string().nullable(),
   score: z.number().nullable(),
+  model: z.string().nullable(),
+  created_at: z.string(),
   findings: z.array(ApiFinding),
 });
 export type ApiReview = z.infer<typeof ApiReview>;
@@ -64,6 +72,7 @@ export const ApiConvention = z.object({
   rule: z.string(),
   evidence_path: z.string(),
   line_start: z.number().int().nullable(),
+  confidence: z.number(),
   status: z.string(),
 });
 export type ApiConvention = z.infer<typeof ApiConvention>;
@@ -74,6 +83,53 @@ export const StartedRun = z.object({
   agent_name: z.string(),
 });
 export type StartedRun = z.infer<typeof StartedRun>;
+
+const ApiBlastCaller = z.object({ name: z.string(), file: z.string(), line: z.number().int() });
+const ApiBlastDownstream = z.object({
+  symbol: z.string(),
+  file: z.string(),
+  kind: z.string(),
+  callers: z.array(ApiBlastCaller),
+  endpoints_affected: z.array(z.string()),
+  crons_affected: z.array(z.string()),
+});
+
+/** GET /pulls/:id/blast. `reason` is a plain string so a new server-side reason does not break the tool. */
+export const ApiBlast = z.object({
+  pr_id: z.string(),
+  head_sha: z.string(),
+  indexed_sha: z.string().nullable(),
+  link_sha: z.string(),
+  changed_symbols: z.array(z.object({ name: z.string(), file: z.string(), kind: z.string() })),
+  downstream: z.array(ApiBlastDownstream),
+  unattributed_endpoints: z.array(z.string()),
+  summary: z.string(),
+  counts: z.object({
+    symbols: z.number().int(),
+    callers: z.number().int(),
+    endpoints: z.number().int(),
+    crons: z.number().int(),
+  }),
+  callers_omitted: z.number().int(),
+  degraded: z.boolean(),
+  reason: z.string().nullable(),
+});
+export type ApiBlast = z.infer<typeof ApiBlast>;
+
+/** GET /pulls/:id/prior-pulls — earlier PRs of the same repo touching this PR's files (newest first). */
+export const ApiPriorPull = z.object({
+  pr_id: z.string(),
+  number: z.number().int(),
+  title: z.string(),
+  author: z.string(),
+  status: z.string(),
+  updated_at: z.string().nullable(),
+  shared_count: z.number().int(),
+  shared_files: z.array(z.string()),
+});
+export type ApiPriorPull = z.infer<typeof ApiPriorPull>;
+export const ApiPriorPulls = z.object({ pr_id: z.string(), total: z.number().int(), pulls: z.array(ApiPriorPull) });
+export type ApiPriorPulls = z.infer<typeof ApiPriorPulls>;
 
 const StartReviewResponse = z.object({ runs: z.array(StartedRun) });
 
@@ -151,6 +207,15 @@ export class DevDigestApi {
 
   listConventions(repoId: string, signal?: AbortSignal): Promise<ApiConvention[]> {
     return this.request(z.array(ApiConvention), 'GET', `/repos/${repoId}/conventions`, undefined, signal);
+  }
+
+  /** Read-only impact map of a PR. Never triggers a re-index. */
+  getBlast(prId: string, signal?: AbortSignal): Promise<ApiBlast> {
+    return this.request(ApiBlast, 'GET', `/pulls/${prId}/blast`, undefined, signal);
+  }
+
+  getPriorPulls(prId: string, signal?: AbortSignal): Promise<ApiPriorPulls> {
+    return this.request(ApiPriorPulls, 'GET', `/pulls/${prId}/prior-pulls`, undefined, signal);
   }
 
   private async request<S extends z.ZodTypeAny>(

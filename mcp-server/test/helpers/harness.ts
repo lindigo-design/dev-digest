@@ -12,20 +12,56 @@ export const SECURITY: ApiAgent = {
   id: 'agent-sec',
   name: 'Security Reviewer',
   description: 'Flags secrets, injection, SSRF and the lethal trifecta before merge.',
+  model: 'deepseek/deepseek-v4-flash',
   enabled: true,
 };
-export const STYLE: ApiAgent = { id: 'agent-style', name: 'Style Reviewer', description: 'Naming and style.', enabled: false };
+export const STYLE: ApiAgent = {
+  id: 'agent-style',
+  name: 'Style Reviewer',
+  description: 'Naming and style.',
+  model: 'openai/gpt-4.1-mini',
+  enabled: false,
+};
 
 export function finding(severity: string, i = 0, extra: Partial<ApiFinding> = {}): ApiFinding {
   return {
     severity,
+    category: 'security',
     title: `${severity} issue ${i}`,
     file: `src/f${i}.ts`,
     start_line: 10 + i,
     rationale: `Why ${severity} ${i} matters.`,
+    suggestion: `Fix ${i}.`,
     dismissed_at: null,
     ...extra,
   };
+}
+
+/** A finished run + its stored review (seeded state for get_findings tests). */
+export function doneRun(runId: string, agent: ApiAgent, findings: ApiFinding[], extra: { cost?: number; createdAt?: string } = {}) {
+  const run: ApiRun = {
+    run_id: runId,
+    agent_id: agent.id,
+    agent_name: agent.name,
+    status: 'done',
+    error: null,
+    ran_at: null,
+    cost_usd: extra.cost ?? 0.0123,
+  };
+  const review: ApiReview = {
+    id: `review-${runId}`,
+    run_id: runId,
+    agent_id: agent.id,
+    agent_name: agent.name,
+    kind: 'review',
+    verdict: findings.length ? 'request_changes' : 'approve',
+    summary: `Summary of ${runId}.`,
+    score: findings.length ? 40 : 95,
+    model: agent.model,
+    created_at: extra.createdAt ?? '2026-11-08T10:00:00.000Z',
+    findings,
+  };
+  return { run, review };
 }
 
 /** In-memory DevDigest API state; tests mutate it before calling tools. */
@@ -46,6 +82,18 @@ export interface FakeState {
   /** Called with every request as "METHOD /path" (before it is answered). */
   onCall?: (call: string) => void;
   unreachable?: boolean;
+  /** Delay every fake API answer by this many ms (slow API / slow resolution). */
+  latencyMs?: number;
+  /** Body of GET /pulls/:id/blast; unset → 404. */
+  blast?: unknown;
+  /** Force GET /pulls/:id/blast to answer this error status. */
+  blastStatus?: number;
+  /** Body of GET /pulls/:id/prior-pulls; unset → empty list. */
+  priorPulls?: unknown;
+  /** Force GET /pulls/:id/prior-pulls to answer this error status. */
+  priorStatus?: number;
+  /** PRs per repo id; overrides `pulls` (which belongs to REPO) for the listed repos. */
+  pullsByRepo?: Record<string, { id: string; number: number; title: string }[]>;
   calls: string[];
 }
 
@@ -75,11 +123,12 @@ export function fakeFetch(state: FakeState) {
     state.calls.push(`${method} ${path}`);
     state.onCall?.(`${method} ${path}`);
     if (state.unreachable) throw new TypeError('fetch failed');
+    if (state.latencyMs) await new Promise((r) => setTimeout(r, state.latencyMs));
 
     if (method === 'GET' && path === '/agents') return json(state.agents);
     if (method === 'GET' && path === '/repos') return json(state.repos);
     let m = path.match(/^\/repos\/([^/]+)\/pulls$/);
-    if (method === 'GET' && m) return json(m[1] === REPO.id ? state.pulls : []);
+    if (method === 'GET' && m) return json(state.pullsByRepo?.[m[1]!] ?? (m[1] === REPO.id ? state.pulls : []));
     m = path.match(/^\/repos\/([^/]+)\/conventions$/);
     if (method === 'GET' && m) return json(state.conventions);
 
@@ -93,7 +142,15 @@ export function fakeFetch(state: FakeState) {
       }
       const { agentId } = JSON.parse(String(init?.body)) as { agentId: string };
       const agent = state.agents.find((a) => a.id === agentId)!;
-      const run: ApiRun = { run_id: 'run-new', agent_id: agentId, agent_name: agent.name, status: 'running', error: null, ran_at: null };
+      const run: ApiRun = {
+        run_id: 'run-new',
+        agent_id: agentId,
+        agent_name: agent.name,
+        status: 'running',
+        error: null,
+        ran_at: null,
+        cost_usd: null,
+      };
       state.runs.unshift(run);
       return json({ pr_id: m[1], runs: [{ run_id: run.run_id, agent_id: agentId, agent_name: agent.name }], reviews: [] });
     }
@@ -108,7 +165,11 @@ export function fakeFetch(state: FakeState) {
         started.status = next;
         if (next === 'failed') started.error = 'OpenRouter 402: requires more credits';
         if (next === 'done') {
+          started.cost_usd = 0.0042;
           state.reviews.unshift({
+            id: `review-${trackedId}`,
+            model: state.agents.find((a) => a.id === started.agent_id)?.model ?? null,
+            created_at: '2026-11-08T12:00:00.000Z',
             run_id: trackedId,
             agent_id: started.agent_id,
             agent_name: started.agent_name,
@@ -124,6 +185,22 @@ export function fakeFetch(state: FakeState) {
     }
     m = path.match(/^\/pulls\/([^/]+)\/reviews$/);
     if (method === 'GET' && m) return json(state.reviews);
+
+    m = path.match(/^\/pulls\/([^/]+)\/prior-pulls$/);
+    if (method === 'GET' && m) {
+      if (state.priorStatus !== undefined) {
+        return json({ error: { code: 'internal_error', message: 'boom' } }, state.priorStatus);
+      }
+      return json(state.priorPulls ?? { pr_id: m[1], total: 0, pulls: [] });
+    }
+
+    m = path.match(/^\/pulls\/([^/]+)\/blast$/);
+    if (method === 'GET' && m) {
+      if (state.blastStatus !== undefined || state.blast === undefined) {
+        return json({ error: { code: 'not_found', message: 'Pull request not found' } }, state.blastStatus ?? 404);
+      }
+      return json(state.blast);
+    }
 
     return json({ error: { code: 'not_found', message: `No route ${method} ${path}` } }, 404);
   };
