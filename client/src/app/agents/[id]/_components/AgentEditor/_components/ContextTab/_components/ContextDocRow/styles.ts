@@ -1,0 +1,80 @@
+import type { CSSProperties } from "react";
+
+const HANDLE_WIDTH = 22;
+const CHECKBOX_SIZE = 16;
+
+/** Co-located styles for one row of the agent's Context tab. */
+export const s = {
+  row: (attached: boolean, dragOver: boolean): CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "1px solid " + (dragOver ? "var(--accent)" : "var(--border)"),
+    background: attached ? "var(--bg-elevated)" : "var(--bg-surface)",
+  }),
+  handle: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: HANDLE_WIDTH,
+    height: 22,
+    padding: 0,
+    flexShrink: 0,
+    borderRadius: 4,
+    border: "none",
+    background: "transparent",
+    color: "var(--text-muted)",
+    cursor: "grab",
+  } satisfies CSSProperties,
+  handleSpacer: { width: HANDLE_WIDTH, flexShrink: 0 } satisfies CSSProperties,
+  checkbox: (checked: boolean): CSSProperties => ({
+    width: CHECKBOX_SIZE,
+    height: CHECKBOX_SIZE,
+    flexShrink: 0,
+    borderRadius: 4,
+    border: "1.5px solid " + (checked ? "var(--accent)" : "var(--border-strong)"),
+    background: checked ? "var(--accent-bg)" : "transparent",
+    color: "var(--accent-text)",
+    display: "grid",
+    placeItems: "center",
+    padding: 0,
+    cursor: "pointer",
+  }),
+  checkboxSpacer: { width: CHECKBOX_SIZE, flexShrink: 0 } satisfies CSSProperties,
+  nameBlock: {
+    minWidth: 0,
+    display: "flex",
+    alignItems: "baseline",
+    gap: 8,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+  name: (attached: boolean): CSSProperties => ({
+    fontSize: 13,
+    fontWeight: 600,
+    color: attached ? "var(--text-primary)" : "var(--text-secondary)",
+    flexShrink: 0,
+  }),
+  folder: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  } satisfies CSSProperties,
+  spacer: { flex: 1 } satisfies CSSProperties,
+  textBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    fontSize: 12,
+    padding: "3px 8px",
+    borderRadius: 5,
+    border: "1px solid var(--border-strong)",
+    background: "transparent",
+    color: "var(--text-secondary)",
+    cursor: "pointer",
+    flexShrink: 0,
+  } satisfies CSSProperties,
+} as const;

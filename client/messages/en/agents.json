@@ -49,7 +49,8 @@
       "skills": "Skills",
       "evals": "Evals",
       "stats": "Stats",
-      "ci": "CI"
+      "ci": "CI",
+      "context": "Context"
     }
   },
   "config": {
@@ -124,5 +125,32 @@
     "pending": "Deleting…",
     "cancel": "Cancel",
     "deleted": "Agent deleted"
+  },
+  "contextTab": {
+    "title": "Project context",
+    "hint": "Order matters — earlier docs appear earlier in the <code>## Project context</code> block.",
+    "attachedCount": "{attached} of {total} attached",
+    "footerTokens": "≈ {count, number} tokens",
+    "overSoftCap": "over 4K soft cap",
+    "footerNote": "Injected as an untrusted block (<code>## Project context</code>) into every run.",
+    "moved": "{path} moved to position {position} of {total}",
+    "tooLarge": "{path} is ~{count} tokens — over the 4,000-token cap on its own, so it will be left out of every run.",
+    "filterPlaceholder": "Filter documents…",
+    "noMatch": "No documents found",
+    "noDocs": "No Markdown docs in this repository at the last synced commit.",
+    "noRepo": "Select a repository to attach its docs.",
+    "missing": "missing",
+    "missingHint": "Not found at the last synced commit",
+    "attachLabel": "Attach {path}",
+    "detach": "Detach",
+    "detachLabel": "Detach {path}",
+    "preview": "Preview",
+    "previewLabel": "Preview {path}",
+    "attached": "Attached",
+    "attach": "Attach",
+    "dragHandle": "Reorder {path} (drag, or press Arrow Up / Arrow Down)",
+    "saveError": "Couldn’t save attachments",
+    "loadError": "Couldn’t load documents",
+    "close": "Close preview"
   }
 }
