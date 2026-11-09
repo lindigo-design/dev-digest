@@ -8,7 +8,7 @@
  * not yet exported, add a placeholder below marked
  * `// TODO: reconcile with @devdigest/shared`.
  */
-import type { ChangedSymbol, DownstreamImpact, RunTrace, SkillType } from "@devdigest/shared";
+import type { ChangedSymbol, DownstreamImpact, FeatureModelChoice, Risk, RunTrace, SkillType } from "@devdigest/shared";
 
 export type {
   Settings,
@@ -271,11 +271,83 @@ export interface PriorPullsResponse {
   pulls: PriorPull[];
 }
 
+// ---- GET/POST /pulls/:id/brief — mirrors server/src/modules/brief/domain/types.ts (not in @devdigest/shared).
+
+export type BriefIntentReason = "not_derived" | "failed";
+
+export type BriefMissingInput =
+  | { input: "intent"; reason: BriefIntentReason }
+  | { input: "blast"; reason: BlastDegradedReason }
+  | { input: "smart_diff_roles"; reason: "not_in_build" };
+
+/** All 0 = nothing was cut from the model input. */
+export interface BriefTruncation {
+  spec_docs: number;
+  callers: number;
+  boilerplate_hunk_files: number;
+}
+
+/** `ref` = "path" or "path:start-end"; in_diff false = blast-map-only file. */
+export interface BriefFileRef {
+  ref: string;
+  path: string;
+  start_line: number | null;
+  end_line: number | null;
+  in_diff: boolean;
+}
+
+export type BriefRisk = Risk & { refs: BriefFileRef[] };
+
+export interface BriefFocusItem {
+  file: string;
+  line: number;
+  file_level: boolean;
+  in_diff: boolean;
+  reason: string;
+}
+
+export interface BriefUsage {
+  provider: FeatureModelChoice["provider"];
+  model: string;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number | null;
+}
+
+export interface StoredBrief {
+  summary: string;
+  risks: BriefRisk[];
+  review_focus: BriefFocusItem[];
+  missing_inputs: BriefMissingInput[];
+  truncated: BriefTruncation;
+  head_sha: string;
+  blast_link_sha: string | null;
+  usage: BriefUsage;
+  generated_at: string;
+}
+
+export interface PrBriefResponse {
+  pr_id: string;
+  model: FeatureModelChoice;
+  changed_files: number;
+  generating: boolean;
+  outdated: boolean;
+  brief: StoredBrief | null;
+}
+
+export type BriefFailureReason = "provider_error" | "timeout" | "invalid_reply";
+
+export type BriefErrorCode =
+  | "brief_no_changed_files"
+  | "brief_too_large"
+  | "brief_model_not_configured"
+  | "brief_generation_failed";
+
 /* ---------------------------------------------------------------------------
  * Project Context Folder (SPEC-01). Local mirrors of
  * server/src/modules/context/domain.ts — not in @devdigest/shared.
  * ------------------------------------------------------------------------- */
-export type DocSource = "readme" | "insights" | "specs" | "docs";
+export type DocSource = "readme" | "insights" | "specs" | "docs" | "devdigest";
 
 export interface ContextDoc {
   path: string;
@@ -328,7 +400,70 @@ export type ProjectContextTrace =
       included: { path: string; tokens: number }[];
       left_out: { path: string; tokens: number | null; reason: LeftOutReason }[];
       changed_by_pr: string[];
+      /** Attached repo docs not read because the repo is not cloned (while a .devdigest doc was). */
+      repo_unavailable?: string[];
     };
+
+export type DevdigestNameRule =
+  | "empty"
+  | "dot_dot"
+  | "backslash"
+  | "leading_slash"
+  | "line_break"
+  | "too_long"
+  | "empty_segment";
+
+export type DevdigestDocErrorReason =
+  | "invalid_name"
+  | "exists"
+  | "limit_reached"
+  | "too_large"
+  | "not_markdown"
+  | "not_text";
+
+/** `details` of every 409/422 from the devdigest routes. */
+export interface DevdigestDocErrorDetails {
+  reason: DevdigestDocErrorReason;
+  rule?: DevdigestNameRule;
+  path?: string;
+  doc_id?: string;
+  limit?: number;
+}
+
+export interface DevdigestDocMeta {
+  id: string;
+  path: string;
+  tokens: number;
+  copied_from: string | null;
+  updated_at: string;
+}
+
+/** GET /repos/:id/devdigest-docs — also carries the page footer/notice data. */
+export interface DevdigestDocList {
+  repo_id: string;
+  /** Sorted by path (byte order). */
+  docs: DevdigestDocMeta[];
+  limit: number;
+  /** Repo-intel index updatedAt; null when never indexed. */
+  synced_at: string | null;
+  ignored_repo_paths: number;
+}
+
+export interface DevdigestDoc extends DevdigestDocMeta {
+  repo_id: string;
+  content: string;
+  used_by: { id: string; name: string }[];
+}
+
+export interface DevdigestCopyResult {
+  created: boolean;
+  doc: DevdigestDoc;
+}
+
+export interface DevdigestDeleteResult {
+  deleted: string;
+  detached_agents: number;
+}
 
 /** GET /runs/:id/trace — the stored trace plus the optional project-context block. */
 export type RunTraceView = RunTrace & { project_context?: ProjectContextTrace | null };

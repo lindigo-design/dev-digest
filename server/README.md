@@ -51,7 +51,7 @@ flowchart LR
 - **Validation is schema-first.** Each route declares zod `params`/`body` schemas
   (`fastify-type-provider-zod`); invalid input is rejected with a `422` **before**
   the handler runs — handlers no longer hand-roll `Schema.parse(req.body)`.
-- **Rate limiting:** a global 120/min limit (disabled under `NODE_ENV=test`), with
+- **Rate limiting:** a global per-IP limit, 120/min by default (`RATE_LIMIT_MAX`; disabled under `NODE_ENV=test`), with
   tighter per-route caps on expensive endpoints (e.g. `POST /pulls/:id/review`);
   SSE and `/health*` are exempt.
 - Modules are registered statically in `src/modules/index.ts` (one import + one
@@ -68,6 +68,7 @@ flowchart TB
     pulls["pulls<br/>/pulls/:id · /pulls/:id/comments"]
     polling["polling<br/>/repos/:id/poll"]
     intent["intent<br/>/pulls/:id/intent · /pulls/:id/intent/refresh"]
+    brief["brief<br/>GET · POST /pulls/:id/brief"]
   end
   subgraph Review["Review & runs"]
     reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
@@ -86,6 +87,37 @@ flowchart TB
   HEALTH["/health (liveness) · /health/ready (DB ping → 200/503)"]
 ```
 
+### Context (Project Context Folder, SPEC-01 / SPEC-03)
+
+Module `modules/context/`. Every route resolves the workspace; another workspace's repo/agent/doc → 404.
+
+| Route | Purpose |
+|---|---|
+| `GET /repos/:id/context-docs` | Repo markdown docs + the repo's `.devdigest` docs (`source: "devdigest"`) |
+| `GET /repos/:id/context-docs/content?path=` | One doc with its content |
+| `GET /agents/:id/context-docs?repo_id=` | Docs an agent reads for that repo, in order |
+| `PUT /agents/:id/context-docs` | Replace that ordered list |
+| `GET /repos/:id/devdigest-docs` | DevDigest-owned docs (`.devdigest/specs/`) + `synced_at`, `ignored_repo_paths`, `limit` |
+| `POST /repos/:id/devdigest-docs` | Create an empty doc `{folder, name}` → 201 (409 `exists`, 422 `invalid_name` / `limit_reached`) |
+| `POST /repos/:id/devdigest-docs/uploads` | Upload one base64 `.md` `{folder, filename, content_base64, overwrite}` → 201 new / 200 overwritten (409 `exists`, 422 `not_markdown` / `too_large` / `not_text`) |
+| `POST /repos/:id/devdigest-docs/copies` | Copy a repo doc `{source_path}` → 201 created / 200 existing copy |
+| `GET /devdigest-docs/:id` | One doc with content and `used_by` agents |
+| `PUT /devdigest-docs/:id` | Save `{content}` (422 `too_large` above 1 MiB UTF-8) |
+| `DELETE /devdigest-docs/:id` | Delete and detach from agents → `{deleted, detached_agents}` |
+
+Error `details` follow `DevdigestDocErrorDetails` (`reason`, `rule`, `path`, `doc_id`, `limit`).
+
+### Brief (PR Why + Risk Brief, SPEC-06)
+
+Module `modules/brief/`. One model call over precomputed facts (hunk headers only, no patch lines); the brief is stored in `pr_brief`. Another workspace's PR → 404 before any work.
+
+| Route | Purpose |
+|---|---|
+| `GET /pulls/:id/brief` | Stored brief or `brief: null`, `generating`, `outdated`, `changed_files`, effective `model`. Never calls a model |
+| `POST /pulls/:id/brief` | Generate (or regenerate) now; concurrent requests share one call. Rate-limited 10/min |
+
+POST errors: 404 `not_found`, 422 `brief_no_changed_files` / `brief_too_large` (`tokens`, `limit`) / `brief_model_not_configured` (`provider`), 502 `brief_generation_failed` (`reason`: `provider_error` | `timeout` | `invalid_reply`), 429 `rate_limited`.
+
 ## Environment
 
 `server/.env` (copied from `.env.example`):
@@ -101,6 +133,7 @@ flowchart TB
 | `DEVDIGEST_CLONE_DIR` | `./clones` | imported-repo checkouts (git-ignored) |
 | `LOG_LEVEL` | `info` (`silent` in test) | pino level |
 | `NODE_ENV` | `development` | `test` → silent logs + global rate-limit disabled |
+| `RATE_LIMIT_MAX` | `120` | global requests per minute per IP; the e2e CI stack raises it (`e2e-web.yml`) |
 
 Secrets (API keys, `GITHUB_TOKEN`) are **not** part of `AppConfig` — they go
 through `SecretsProvider` (`~/.devdigest/secrets.json`, mode `0600`, with
